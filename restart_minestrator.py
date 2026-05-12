@@ -13,7 +13,8 @@ SERVER_ID  = os.environ.get("MINESTRATOR_SERVER_ID", "").strip()
 AUTH_TOKEN = os.environ.get("MINESTRATOR_AUTH", "").strip()
 
 _proxy = os.environ.get("GOST_PROXY", "").strip()
-LOCAL_PROXY = "http://127.0.0.1:8080" if _proxy else None
+_local_proxy = os.environ.get("LOCAL_PROXY", "").strip()
+LOCAL_PROXY = _local_proxy if _local_proxy else ("http://127.0.0.1:8080" if _proxy else None)
 
 _tg = os.environ.get("TG_BOT", "").strip()
 TG_CHAT_ID = _tg.split(",")[0].strip() if _tg else ""
@@ -285,4 +286,10 @@ def run_script():
 
 
 if __name__ == "__main__":
-    run_script()
+    try:
+        run_script()
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"💥 脚本异常退出: {e}")
+        import sys; sys.exit(1)
