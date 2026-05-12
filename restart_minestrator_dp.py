@@ -114,9 +114,14 @@ def solve_turnstile(page, timeout=60):
 def main():
     print("🔧 启动 DrissionPage 浏览器...")
     co = ChromiumOptions()
-    co.headless()
+    # Don't use headless when Xvfb is available
+    # co.headless()  # Xvfb provides virtual display instead
+    co.set_argument('--no-sandbox')
+    co.set_argument('--disable-gpu')
+    co.set_argument('--disable-dev-shm-usage')
     if PROXY:
         co.set_proxy(PROXY)
+        print(f"🌐 使用代理: {PROXY}")
         print(f"🌐 使用代理: {PROXY}")
     
     try:
