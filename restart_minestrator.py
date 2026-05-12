@@ -235,6 +235,52 @@ def send_restart(sb, token: str) -> bool:
 # 主流程
 # ============================================================
 
+def try_direct_restart():
+    """Try to restart server via direct API call (no browser needed)."""
+    print("🔧 尝试直接 API 调用重启（无需 Turnstile）...")
+    if not AUTH_TOKEN or not SERVER_ID:
+        print("❌ 缺少 AUTH_TOKEN 或 SERVER_ID")
+        return False
+    
+    # Method 1: Try without turnstile_token at all
+    import subprocess
+    for attempt in ["no_turnstile", "empty_turnstile", "dummy_turnstile"]:
+        print(f"  尝试: {attempt}...")
+        if attempt == "no_turnstile":
+            body = json.dumps({"poweraction": "restart"})
+        elif attempt == "empty_turnstile":
+            body = json.dumps({"poweraction": "restart", "turnstile_token": ""})
+        else:
+            body = json.dumps({"poweraction": "restart", "turnstile_token": "dummy"})
+        
+        try:
+            cmd = [
+                "curl", "-s", "-X", "PUT",
+                API_URL,
+                "-H", f"Authorization: {AUTH_TOKEN}",
+                "-H", "Content-Type: application/json",
+                "-H", "Accept: application/json",
+                "-H", "X-Requested-With: XMLHttpRequest",
+                "-d", body,
+                "--connect-timeout", "15",
+                "--max-time", "20"
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+            print(f"    响应: {result.stdout[:200]}")
+            try:
+                data = json.loads(result.stdout)
+                if data.get("api", {}).get("code") == 200:
+                    print(f"✅ 直接 API 调用成功！（{attempt}）")
+                    return True
+            except:
+                pass
+        except Exception as e:
+            print(f"    错误: {e}")
+    
+    print("❌ 直接 API 调用失败，需要浏览器获取 Turnstile Token")
+    return False
+
+
 def run_script():
     print("🔧 启动浏览器...")
 
@@ -488,10 +534,13 @@ def run_script():
 
 
 if __name__ == "__main__":
-    try:
-        run_script()
-    except SystemExit:
-        raise
-    except Exception as e:
-        print(f"💥 脚本异常退出: {e}")
-        import sys; sys.exit(1)
+    # Try direct API first (no browser needed)
+    if not try_direct_restart():
+        print("\n🔄 直接 API 失败，启动浏览器模式...")
+        try:
+            run_script()
+        except SystemExit:
+            raise
+        except Exception as e:
+            print(f"💥 脚本异常退出: {e}")
+            import sys; sys.exit(1)
