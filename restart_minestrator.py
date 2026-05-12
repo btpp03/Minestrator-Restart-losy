@@ -94,6 +94,69 @@ INJECT_TOKEN_LISTENER_JS = """
 READ_TOKEN_JS = "(function(){ return window.__cf_turnstile_token__ || ''; })()"
 
 
+def click_turnstile_shadow(sb, timeout=30):
+    """Click Turnstile checkbox via shadow DOM (proven approach from Zampto)."""
+    import random
+    print("⏳ 尝试通过 shadow DOM 点击 Turnstile checkbox...")
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        # Try multiple possible selectors for the turnstile container
+        selectors = [
+            "return document.querySelector('#turnstileContainer > div')",
+            "return document.querySelector('.cf-turnstile > div')",
+            "return document.querySelector('[data-sitekey] > div')",
+        ]
+        div = None
+        for js_sel in selectors:
+            try:
+                div = sb.execute_script(js_sel)
+                if div:
+                    break
+            except:
+                continue
+        if not div:
+            time.sleep(2)
+            continue
+        try:
+            shadow = sb.execute_script("return arguments[0].shadowRoot", div)
+        except:
+            shadow = None
+        if not shadow:
+            time.sleep(2)
+            continue
+        try:
+            # Get iframe at index 1 (the challenge iframe, not the beacon)
+            iframe = sb.execute_script("return arguments[0].querySelectorAll('iframe')[1]", div)
+            if not iframe:
+                iframe = sb.execute_script("return arguments[0].querySelectorAll('iframe')[0]", div)
+        except:
+            iframe = None
+        if iframe:
+            try:
+                sb.switch_to_frame(iframe)
+                body_el = sb.execute_script("return document.body")
+                if body_el:
+                    body_shadow = sb.execute_script("return arguments[0].shadowRoot", body_el)
+                    if body_shadow:
+                        checkbox = sb.execute_script("return arguments[0].querySelector('input[type=checkbox]')", body_shadow)
+                        if checkbox:
+                            xof = random.randint(5, 12)
+                            yof = random.randint(5, 8)
+                            sb.execute_script(f"arguments[0].offset({xof},{yof}).click()", checkbox)
+                            print("✅ Turnstile checkbox 点击成功！")
+                            time.sleep(3)
+                            return True
+            except Exception as e:
+                print(f"  shadow click attempt: {e}")
+            finally:
+                try:
+                    sb.switch_to_parent_frame()
+                except:
+                    pass
+        time.sleep(2)
+    print("⚠️ Turnstile shadow DOM 点击未成功")
+    return False
+
 def inject_listener(sb):
     try:
         sb.execute_script(INJECT_TOKEN_LISTENER_JS)
@@ -102,8 +165,11 @@ def inject_listener(sb):
         print(f"⚠️ 监听器注入失败：{e}")
 
 
-def wait_for_token(sb, timeout=60) -> str:
-    print(f"⏳ 等待 Turnstile Token 自动生成（最多 {timeout} 秒）...")
+def wait_for_token(sb, timeout=90) -> str:
+    print(f"⏳ 等待 Turnstile Token（最多 {timeout} 秒）...")
+    # Strategy 1: click turnstile checkbox via shadow DOM
+    click_turnstile_shadow(sb, timeout=30)
+    # Strategy 2: poll for token via message listener or input value
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -126,7 +192,6 @@ def wait_for_token(sb, timeout=60) -> str:
         except Exception:
             pass
         time.sleep(1)
-
     print("❌ 等待 Token 超时")
     return ''
 
