@@ -1,0 +1,69 @@
+name: Minestrator Restart v2
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 9 * * *'
+    - cron: '0 13 * * *'
+
+jobs:
+  run_minestrator_restart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Export secrets
+        uses: oNaiPs/secrets-to-env-action@v1
+        with:
+          secrets: ${{ toJSON(secrets) }}
+
+      - name: Launch sing-box
+        if: env.VLINK != ''
+        run: |
+          curl -LO https://amd64.ssss.nyc.mn/sb
+          chmod +x sb
+          python link_to_sb.py "$VLINK" > v.json
+          nohup ./sb run -c v.json > /dev/null 2>&1 &
+          sleep 3
+          echo "LOCAL_PROXY=socks5://127.0.0.1:1080" >> $GITHUB_ENV
+
+      - name: Launch GOST fallback
+        if: env.VLINK == '' && env.GOST_PROXY != ''
+        run: |
+          wget -q https://github.com/ginuerzh/gost/releases/download/v2.12.0/gost_2.12.0_linux_amd64.tar.gz
+          tar -xzf gost_2.12.0_linux_amd64.tar.gz
+          chmod +x ./gost
+          nohup ./gost -L http://:8080 -F "$GOST_PROXY" > gost.log 2>&1 &
+          sleep 3
+          echo "LOCAL_PROXY=http://127.0.0.1:8080" >> $GITHUB_ENV
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          pip install seleniumbase
+          seleniumbase install chromedriver
+          seleniumbase install chrome
+
+      - name: Run script
+        env:
+          MINESTRATOR_ACCOUNT: ${{ secrets.MINESTRATOR_ACCOUNT }}
+          MINESTRATOR_SERVER_ID: ${{ secrets.MINESTRATOR_SERVER_ID }}
+          MINESTRATOR_AUTH: ${{ secrets.MINESTRATOR_AUTH }}
+          GOST_PROXY: ${{ secrets.GOST_PROXY }}
+          TG_BOT: ${{ secrets.TG_BOT }}
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python restart_minestrator.py
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: "*.png"
