@@ -310,14 +310,151 @@ def run_script():
         print(f"📄 当前页面：{sb.get_current_url()}")
         sb.save_screenshot("server_page.png")
 
-        # ── 注入监听器 ────────────────────────────────────────
-        inject_listener(sb)
+        # ── 等待 Turnstile Token（多策略）────────────────────
+        token = ""
+        
+        # Strategy 1: Poll hidden input (Turnstile may have already completed)
+        print("🔍 策略1: 检查 Turnstile 是否已自动完成...")
+        for i in range(15):
+            try:
+                val = sb.execute_script("""
+                    (function(){
+                        var inp = document.querySelector('input[name="cf-turnstile-response"]');
+                        if (inp && inp.value && inp.value.length > 20) return inp.value;
+                        // Also check for cf_turnstile_response
+                        inp = document.querySelector('input[name="cf_turnstile_response"]');
+                        if (inp && inp.value && inp.value.length > 20) return inp.value;
+                        // Check for data-sitekey containers
+                        var containers = document.querySelectorAll('[data-sitekey]');
+                        for (var c of containers) {
+                            var hidden = c.querySelector('input[type=hidden]');
+                            if (hidden && hidden.value && hidden.value.length > 20) return hidden.value;
+                        }
+                        return '';
+                    })()
+                """)
+                if val and len(val) > 20:
+                    token = val
+                    print(f"✅ 策略1成功: Token 已存在于隐藏输入 (长度 {len(val)})")
+                    break
+            except:
+                pass
+            time.sleep(2)
+        
+        # Strategy 2: Try SeleniumBase built-in CF handler
+        if not token:
+            print("🔍 策略2: 尝试 uc_gui_click_captcha...")
+            try:
+                sb.uc_gui_click_captcha()
+                time.sleep(5)
+                # Re-check input
+                for i in range(10):
+                    try:
+                        val = sb.execute_script("""
+                            (function(){
+                                var inp = document.querySelector('input[name="cf-turnstile-response"]');
+                                if (inp && inp.value && inp.value.length > 20) return inp.value;
+                                inp = document.querySelector('input[name="cf_turnstile_response"]');
+                                if (inp && inp.value && inp.value.length > 20) return inp.value;
+                                return '';
+                            })()
+                        """)
+                        if val and len(val) > 20:
+                            token = val
+                            print(f"✅ 策略2成功: uc_gui_click_captcha 后 Token 获取 (长度 {len(val)})")
+                            break
+                    except:
+                        pass
+                    time.sleep(2)
+            except Exception as e:
+                print(f"  uc_gui_click_captcha 异常: {e}")
+        
+        # Strategy 3: Inject message listener + click shadow DOM
+        if not token:
+            print("🔍 策略3: 注入监听器 + shadow DOM 点击...")
+            inject_listener(sb)
+            click_turnstile_shadow(sb, timeout=20)
+            for i in range(15):
+                try:
+                    val = sb.execute_script(READ_TOKEN_JS)
+                    if val and len(val) > 20:
+                        token = val
+                        print(f"✅ 策略3成功: Token 通过消息监听获取 (长度 {len(val)})")
+                        break
+                except:
+                    pass
+                # Also check hidden input
+                try:
+                    val2 = sb.execute_script("""
+                        (function(){
+                            var inp = document.querySelector('input[name="cf-turnstile-response"]');
+                            return (inp && inp.value && inp.value.length > 20) ? inp.value : '';
+                        })()
+                    """)
+                    if val2 and len(val2) > 20:
+                        token = val2
+                        print(f"✅ 策略3成功: Token 从输入框获取 (长度 {len(val2)})")
+                        break
+                except:
+                    pass
+                time.sleep(2)
+        
+        # Strategy 4: Force Turnstile re-execution via JS
+        if not token:
+            print("🔍 策略4: 强制重新执行 Turnstile...")
+            try:
+                sb.execute_script("""
+                    (function(){
+                        // Try to find and call turnstile.render or turnstile.execute
+                        if (window.turnstile) {
+                            console.log('[ForceTurnstile] Found window.turnstile');
+                            // Get sitekey from existing container
+                            var container = document.querySelector('[data-sitekey]');
+                            var sitekey = container ? container.getAttribute('data-sitekey') : '';
+                            if (sitekey) {
+                                console.log('[ForceTurnstile] sitekey:', sitekey);
+                                // Remove existing and re-render
+                                if (container) container.innerHTML = '';
+                                turnstile.render(container || document.body, {
+                                    sitekey: sitekey,
+                                    callback: function(t) {
+                                        console.log('[ForceTurnstile] Got token:', t.length);
+                                        var inp = document.querySelector('input[name="cf-turnstile-response"]');
+                                        if (inp) inp.value = t;
+                                        window.__cf_turnstile_token__ = t;
+                                    }
+                                });
+                            }
+                        }
+                    })()
+                """)
+                time.sleep(8)
+                for i in range(10):
+                    try:
+                        val = sb.execute_script(READ_TOKEN_JS)
+                        if val and len(val) > 20:
+                            token = val
+                            print(f"✅ 策略4成功: 强制执行后 Token 获取 (长度 {len(val)})")
+                            break
+                        val2 = sb.execute_script("""
+                            (function(){
+                                var inp = document.querySelector('input[name="cf-turnstile-response"]');
+                                return (inp && inp.value && inp.value.length > 20) ? inp.value : '';
+                            })()
+                        """)
+                        if val2 and len(val2) > 20:
+                            token = val2
+                            print(f"✅ 策略4成功: Token 从输入框获取 (长度 {len(val2)})")
+                            break
+                    except:
+                        pass
+                    time.sleep(2)
+            except Exception as e:
+                print(f"  策略4异常: {e}")
 
-        # ── 等待 Token ────────────────────────────────────────
-        token = wait_for_token(sb, timeout=60)
         if not token:
             sb.save_screenshot("token_timeout.png")
-            send_tg("❌ Token 获取超时", "Turnstile 未能自动完成")
+            send_tg("❌ Token 获取超时", "4种策略均未能获取 Turnstile Token")
             return
 
         # ── 发送重启指令 ──────────────────────────────────────
