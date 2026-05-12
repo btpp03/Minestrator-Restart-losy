@@ -1,4 +1,4 @@
-name: Minestrator-Restart
+name: Minestrator-Restart  # v2
 on:
   workflow_dispatch:
   schedule:
