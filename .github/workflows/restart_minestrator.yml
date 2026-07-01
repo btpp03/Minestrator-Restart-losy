@@ -1,6 +1,6 @@
 name: Minestrator-Restart  # v2
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   schedule:
     - cron: '0 1 * * *'
     - cron: '0 5 * * *'
