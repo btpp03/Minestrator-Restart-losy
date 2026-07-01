@@ -38,7 +38,7 @@ def get_account_name():
 
 ACCOUNT = get_account_name()
 
-REPO_NAME = os.environ.get("GITHUB_REPOSITORY", "minestrator").split("/")[-1]
+REPO_NAME = os.environ.get("GITHUB_REPOSITORY", "minestrator")  # btpp03/Minestrator-Restart-losy
 
 def send_tg(result, detail=''):
     if not TG_TOKEN or not TG_CHAT_ID: return
