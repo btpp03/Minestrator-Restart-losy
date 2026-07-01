@@ -43,8 +43,7 @@ REPO_NAME = os.environ.get("GITHUB_REPOSITORY", "minestrator")  # btpp03/Minestr
 def send_tg(result, detail=''):
     if not TG_TOKEN or not TG_CHAT_ID: return
     msg = (
-        f"[{REPO_NAME}] 
-        f"🎮 Minestrator 重启通知\n🕐 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"[{REPO_NAME}] 🎮 Minestrator 重启通知\n🕐 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         f"👤 账号: {ACCOUNT}\n🖥 服务器: {SERVER_ID}\n📊 结果: {result}\n{detail}"
     )
     try:
