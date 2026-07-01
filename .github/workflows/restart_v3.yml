@@ -15,11 +15,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+      - name: Install deps
+        run: pip install requests pySocks
       - name: Restart server
         env:
           MINESTRATOR_SERVER_ID: ${{ secrets.MINESTRATOR_SERVER_ID }}
-          MINESTRATOR_API_KEY: ${{ secrets.MINESTRATOR_API_KEY }}
-          CF_CLEARANCE: ${{ secrets.CF_CLEARANCE }}
+          MINESTRATOR_AUTH: ${{ secrets.MINESTRATOR_AUTH }}
+          MINESTRATOR_PROXY: ${{ secrets.MINESTRATOR_PROXY }}
           TG_BOT: ${{ secrets.TG_BOT }}
         run: python restart_minestrator_api.py
