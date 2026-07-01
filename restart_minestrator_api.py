@@ -28,11 +28,21 @@ HEADERS = {
     "Referer": f"https://minestrator.com/my/server/{SERVER_ID}",
 }
 
+def get_account_name():
+    try:
+        r = sess.get("https://mine.sttr.io/user/326193", headers=HEADERS, timeout=10)
+        data = r.json()
+        return data.get("api", {}).get("data", {}).get("user", {}).get("datas", {}).get("pseudo", "unknown")
+    except:
+        return "unknown"
+
+ACCOUNT = get_account_name()
+
 def send_tg(result, detail=''):
     if not TG_TOKEN or not TG_CHAT_ID: return
     msg = (
         f"🎮 Minestrator 重启通知\n🕐 {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"🖥 服务器: {SERVER_ID}\n📊 结果: {result}\n{detail}"
+        f"👤 账号: {ACCOUNT}\n🖥 服务器: {SERVER_ID}\n📊 结果: {result}\n{detail}"
     )
     try:
         sess.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
@@ -44,6 +54,7 @@ def send_tg(result, detail=''):
 def main():
     print(f"{'='*50}")
     print(f" Minestrator 重启 — API 版")
+    print(f" 账号: {ACCOUNT}")
     print(f" Server: {SERVER_ID}")
     print(f" Proxy: {'✅' if PROXY_URL else '❌'} {PROXY_URL[:50] if PROXY_URL else ''}")
     print(f"{'='*50}")
