@@ -1,0 +1,25 @@
+name: Minestrator Restart v3 (API)
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 1 * * *'
+    - cron: '0 5 * * *'
+    - cron: '0 9 * * *'
+    - cron: '0 13 * * *'
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restart server
+        env:
+          MINESTRATOR_SERVER_ID: ${{ secrets.MINESTRATOR_SERVER_ID }}
+          MINESTRATOR_API_KEY: ${{ secrets.MINESTRATOR_API_KEY }}
+          CF_CLEARANCE: ${{ secrets.CF_CLEARANCE }}
+          TG_BOT: ${{ secrets.TG_BOT }}
+        run: python restart_minestrator_api.py
